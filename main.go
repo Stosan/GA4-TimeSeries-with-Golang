@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"fmt"
+	campaigns "ga4test/campaign"
 	"log"
 	"time"
 
@@ -12,61 +12,45 @@ import (
 
 func main() {
 
-
 	ctx := context.Background()
 
 	// Replace with your private key file name and property ID.
-	privateKey := "radadspdtest-381223-0871747aa9a9.json"
+	privateKey := "radsp_json.json"
 	propertyID := "352702775"
-
 	// Create a new analyticsdata client.
 	client, err := analyticsdata.NewService(ctx, option.WithCredentialsFile(privateKey))
 	if err != nil {
 		log.Fatalf("Failed to create client: %v", err)
 	}
 
-	// Set the date range for the report.
-	startDate := "2023-02-21"
-	endDate := "2023-03-20"
-
-	// Create a request to get sessions per day.
-	request := &analyticsdata.RunReportRequest{
-		Property: "properties/" + propertyID,
-		DateRanges: []*analyticsdata.DateRange{
-			{
-				StartDate: startDate,
-				EndDate:   endDate,
-			},
-		},
-		Dimensions: []*analyticsdata.Dimension{
-			{
-				Name: "date",
-			},
-		},
-		Metrics: []*analyticsdata.Metric{
-			{
-				Name: "sessions",
-			},
-		},
+	var durCurrent = map[string]string{
+		"start": "2023-11-28",
+		"end":   "2023-12-05",
 	}
-
-	// Run the report and print the result.
-	response, err := client.Properties.RunReport("properties/"+propertyID, request).Do()
+	
+	// Compute durPrior dynamically
+	startDate, err := time.Parse("2006-01-02", durCurrent["start"])
 	if err != nil {
-		log.Fatalf("Failed to get report: %v", err)
+		log.Fatalf("Failed to parse start date: %v", err)
+	}
+	
+	endDate, err := time.Parse("2006-01-02", durCurrent["end"])
+	if err != nil {
+		log.Fatalf("Failed to parse end date: %v", err)
+	}
+	
+	lapsed_duration := endDate.Sub(startDate).Hours() / 24
+	log.Printf("Duration between start and end date: %v days", int(lapsed_duration))
+	
+	startPrior := startDate.AddDate(0, 0, -int(lapsed_duration)).Format("2006-01-02")
+	endPrior := endDate.AddDate(0, 0, -int(lapsed_duration)).Format("2006-01-02")
+	
+	var durPrior = map[string]string{
+		"start": startPrior,
+		"end":   endPrior,
 	}
 
-	sessionsPerDay := make(map[string]string)
-	for _, row := range response.Rows {
-		dateStr := row.DimensionValues[0].Value
-		date, err := time.Parse("20060102", dateStr)
-		if err != nil {
-			log.Fatalf("Failed to parse date: %v", err)
-		}
-		sessions := row.MetricValues[0]
-
-		sessionsPerDay[date.Format("2006-01-02")] = sessions.Value
-	}
-
-	fmt.Printf("%v\n", sessionsPerDay)
+	
+	resp, _ := campaigns.GA4_Analytics_Summary(client, propertyID,durCurrent,durPrior)
+	log.Println(resp)
 }
